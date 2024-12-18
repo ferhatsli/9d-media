@@ -6,7 +6,7 @@
     font-family: 'Poppins', sans-serif;
 }
 body {
-    background: url('./bg.jpeg') fixed;
+    background: url('./bg.jpg') fixed;
     background-size: cover;
     color: #fff;
     position: relative;
@@ -107,7 +107,7 @@ nav a::after {
 
 /* Loading screen update */
 .loading-screen {
-    background: url('./bg.jpeg') fixed;
+    background: url('./bg.jpg') fixed;
     background-size: cover;
 }
 
