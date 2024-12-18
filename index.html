@@ -33,63 +33,61 @@
         </nav>
     </header>
 
-    <!-- Caption Slider -->
-    <section class="slider">
-        <div class="slide active" style="background-image: url('./img_1.jpg');">
-            <div class="slide-content">
-                <h2>Sinemayı Deneyimle</h2>
-                <p>Sinematik hikaye anlatımının olağanüstü dünyasına dalın</p>
-                <div class="slide-buttons">
-                    <a href="#" class="slide-btn primary">Şimdi İzle</a>
-                    <a href="#" class="slide-btn secondary">Detaylar</a>
-                </div>
+    <!-- Slider Section -->
+    <section class="slider" id="home">
+        <div class="slide active">
+            <div class="video-background">
+                <video autoplay muted loop playsinline>
+                    <source src="slider-1.mp4" type="video/mp4">
+                </video>
             </div>
         </div>
-        <div class="slide" style="background-image: url('./img_2.jpg');">
-            <div class="slide-content">
-                <h2>Son Çıkanlar</h2>
-                <p>En yeni gişe rekorları kıran ve ödüllü filmleri keşfedin</p>
-                <div class="slide-buttons">
-                    <a href="#" class="slide-btn primary">Şimdi İzle</a>
-                    <a href="#" class="slide-btn secondary">Detaylar</a>
-                </div>
-            </div>
+        <div class="slide">
+            <img src="slide-2.jpeg" alt="Slide 2">
         </div>
-        <div class="slide" style="background-image: url('./img_3.jpg');">
-            <div class="slide-content">
-                <h2>Premium Kalite</h2>
-                <p>Filmleri 4K çözünürlük ve sürükleyici ses ile deneyimleyin</p>
-                <div class="slide-buttons">
-                    <a href="#" class="slide-btn primary">Şimdi İzle</a>
-                    <a href="#" class="slide-btn secondary">Detaylar</a>
-                </div>
-            </div>
+        <div class="slide">
+            <img src="img_3.jpg" alt="Slide 3">
         </div>
     </section>
 
-    <!-- Trending Movies Section -->
+    <!-- Projects Section -->
     <section class="trending">
-        <h2>Trend Filmler</h2>
-        <div class="movie-grid">
-            <div class="movie">
-                <img src="https://picsum.photos/200/300?random=1" alt="Film 1">
-                <div class="movie-title">Başlangıç</div>
+        <h2>Projelerimiz</h2>
+        <div class="project-categories">
+            <div class="category">
+                <h3>Filmler</h3>
+                <div class="movie-grid">
+                    <div class="movie">
+                        <img src="movie-1.png" alt="Film 1">
+                        <div class="movie-title">Sütçü İmam</div>
+                    </div>
+                    <div class="movie">
+                        <img src="movie-3.jpg" alt="Film 2">
+                        <div class="movie-title">Orhan Gazi</div>
+                    </div>
+                    <div class="movie">
+                        <img src="https://picsum.photos/200/300?random=3" alt="Film 3">
+                        <div class="movie-title">Yıldızlararası</div>
+                    </div>
+                </div>
             </div>
-            <div class="movie">
-                <img src="https://picsum.photos/200/300?random=2" alt="Film 2">
-                <div class="movie-title">Kara Şövalye</div>
-            </div>
-            <div class="movie">
-                <img src="https://picsum.photos/200/300?random=3" alt="Film 3">
-                <div class="movie-title">Yıldızlararası</div>
-            </div>
-            <div class="movie">
-                <img src="https://picsum.photos/200/300?random=4" alt="Film 4">
-                <div class="movie-title">Ucuz Roman</div>
-            </div>
-            <div class="movie">
-                <img src="https://picsum.photos/200/300?random=5" alt="Film 5">
-                <div class="movie-title">Matrix</div>
+            
+            <div class="category">
+                <h3>Diziler</h3>
+                <div class="movie-grid">
+                    <div class="movie">
+                        <img src="https://picsum.photos/200/300?random=4" alt="Dizi 1">
+                        <div class="movie-title">Taht Oyunları</div>
+                    </div>
+                    <div class="movie">
+                        <img src="https://picsum.photos/200/300?random=5" alt="Dizi 2">
+                        <div class="movie-title">Breaking Bad</div>
+                    </div>
+                    <div class="movie">
+                        <img src="https://picsum.photos/200/300?random=6" alt="Dizi 3">
+                        <div class="movie-title">The Crown</div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>

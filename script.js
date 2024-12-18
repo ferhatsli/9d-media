@@ -2,10 +2,9 @@
 document.addEventListener('DOMContentLoaded', () => {
     const loadingScreen = document.querySelector('.loading-screen');
     
-    // Ensure minimum loading time of 2 seconds
+    // Hide loading screen after 2 seconds
     setTimeout(() => {
         loadingScreen.classList.add('fade-out');
-        // Enable scrolling after loading
         document.body.style.overflow = 'visible';
     }, 2000);
 });
@@ -23,10 +22,13 @@ function showSlide(index) {
     });
 }
 
-setInterval(() => {
-    currentIndex = (currentIndex + 1) % slides.length;
-    showSlide(currentIndex);
-}, 5000);
+if (slides.length > 0) {
+    showSlide(0);
+    setInterval(() => {
+        currentIndex = (currentIndex + 1) % slides.length;
+        showSlide(currentIndex);
+    }, 5000);
+}
 
 // Header Scroll Effect
 window.addEventListener('scroll', () => {
