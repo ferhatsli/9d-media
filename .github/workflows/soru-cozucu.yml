@@ -1,0 +1,60 @@
+name: Soru Cozucu EXE
+
+on:
+  push:
+    paths:
+      - "soru-cozucu/**"
+      - ".github/workflows/soru-cozucu.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r soru-cozucu/requirements.txt pyinstaller
+
+      - name: Build exe
+        working-directory: soru-cozucu
+        run: >
+          pyinstaller --onefile --noconsole --name SoruCozucu
+          --hidden-import pystray._win32
+          --collect-submodules anthropic
+          app.py
+
+      - name: Smoke test
+        working-directory: soru-cozucu/dist
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath .\SoruCozucu.exe -ArgumentList "--selftest" -Wait -PassThru
+          Get-Content .\selftest.txt
+          if ($p.ExitCode -ne 0) { exit 1 }
+          Remove-Item .\selftest.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SoruCozucu
+          path: soru-cozucu/dist/SoruCozucu.exe
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: soru-cozucu-v${{ github.run_number }}
+          name: Soru Cozucu v${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: soru-cozucu/dist/SoruCozucu.exe
+          body: |
+            SoruCozucu.exe'yi indir ve cift tikla. Kurulum yok.
+            Ilk acilista config.json olusur: Claude API anahtarini ve Telegram bot token'ini gir.
