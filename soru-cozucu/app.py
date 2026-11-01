@@ -61,6 +61,17 @@ log = logging.getLogger(APP_NAME)
 
 # ---------------------------------------------------------------- yardimcilar
 
+def message_box_async(text, title=APP_NAME):
+    threading.Thread(target=message_box, args=(text, title), daemon=True).start()
+
+
+def open_log():
+    try:
+        subprocess.Popen(["notepad.exe", LOG_PATH])
+    except Exception:
+        pass
+
+
 def message_box(text, title=APP_NAME):
     try:
         ctypes.windll.user32.MessageBoxW(0, text, title, 0x40)
@@ -236,11 +247,19 @@ class App:
             self.icon.icon = img
             self.icon.title = title
 
+    def notify(self, text):
+        try:
+            if self.icon:
+                self.icon.notify(text, APP_NAME)
+        except Exception:
+            pass
+
     def trigger(self, *_):
         now = time.time()
         if now - self.last_trigger < 1.5:  # tus tekrarini engelle
             return
         self.last_trigger = now
+        log.info("Tetiklendi")
         threading.Thread(target=self.run_once, daemon=True).start()
 
     def run_once(self):
@@ -256,6 +275,7 @@ class App:
                 return
             jpeg = take_screenshot(int(cfg.get("monitor", 1)))
             log.info("Ekran goruntusu alindi (%d KB)", len(jpeg) // 1024)
+            self.notify("Ekran alindi, cozuluyor...")
 
             # Telefona hemen "aldim" bildirimi (arka planda, beklemeden)
             def notify():
@@ -277,11 +297,15 @@ class App:
         except Exception as e:
             log.exception("Hata")
             self.set_icon(ICON_ERR, f"{APP_NAME} - hata (log'a bak)")
+            sent = False
             try:
                 if cfg and config_ready(cfg):
                     tg_send_text(cfg, f"❌ Hata: {e}")
-            except Exception:
-                pass
+                    sent = True
+            except Exception as e2:
+                log.warning("Hata Telegram'a da gonderilemedi: %s", e2)
+            if not sent:
+                message_box_async(f"Hata:\n{e}\n\nAyrinti: {LOG_PATH}")
         finally:
             with self.lock:
                 self.busy -= 1
@@ -311,6 +335,25 @@ class App:
         self.register_hotkey(cfg)
         message_box(f"Ayarlar yenilendi. Kisayol tusu: {cfg.get('hotkey')}")
 
+    def test_telegram(self, *_):
+        def run():
+            cfg, _ = load_config()
+            if not config_ready(cfg):
+                message_box("config.json eksik: API anahtari ve Telegram token gir.")
+                open_config()
+                return
+            try:
+                tg_send_text(cfg, "👋 Test mesaji: Soru Cozucu baglandi.")
+                message_box(f"Telegram calisiyor. chat_id: {cfg.get('telegram_chat_id')}")
+            except requests.HTTPError as e:
+                code = e.response.status_code if e.response is not None else "?"
+                hint = " (token yanlis)" if code in (401, 404) else ""
+                message_box(f"Telegram hatasi {code}{hint}:\n{e}")
+            except Exception as e:
+                message_box(f"Telegram hatasi:\n{e}")
+
+        threading.Thread(target=run, daemon=True).start()
+
     def quit(self, icon, *_):
         try:
             keyboard.unhook_all()
@@ -335,6 +378,8 @@ class App:
             pystray.MenuItem("Ekrani coz", self.trigger, default=True),
             pystray.MenuItem("Ayarlari ac (config.json)", lambda *_: open_config()),
             pystray.MenuItem("Ayarlari yenile (kisayol)", self.reload_hotkey),
+            pystray.MenuItem("Telegram'i test et", self.test_telegram),
+            pystray.MenuItem("Log dosyasini ac", lambda *_: open_log()),
             pystray.MenuItem("Cikis", self.quit),
         )
         self.icon = pystray.Icon(APP_NAME, ICON_IDLE, f"{APP_NAME} (tus: {cfg.get('hotkey')})", menu)
