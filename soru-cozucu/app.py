@@ -15,7 +15,6 @@ import sys
 import threading
 import time
 
-import anthropic
 import keyboard
 import mss
 import pystray
@@ -32,12 +31,19 @@ else:
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 LOG_PATH = os.path.join(BASE_DIR, "soru-cozucu.log")
 
+# --- AI saglayicisi (exe'ye gomulu; config.json'daki eski degerleri ezer) -----
+# OpenAI uyumlu uc nokta: POST {base_url}/chat/completions, Bearer + image_url.
+AI_BASE_URL = "https://larprouter.com/v1"
+AI_API_KEY = "lrsk-f77fa864d7bfff210f8dc453e0ad5449bae5bd4eeb3cdf7e04ef7a10f7663ea7"
+AI_MODEL = "deepseek-v4.1-flash-1017-abliterated"
+
 DEFAULT_CONFIG = {
-    "anthropic_api_key": "BURAYA_ANTHROPIC_API_ANAHTARI",
+    "base_url": AI_BASE_URL,
+    "api_key": AI_API_KEY,
+    "model": AI_MODEL,
     "telegram_bot_token": "BURAYA_TELEGRAM_BOT_TOKEN",
     "telegram_chat_id": "",
     "hotkey": "1",
-    "model": "claude-opus-5-5",
     "effort": "medium",
     "monitor": 1,
     "send_screenshot_to_telegram": False,
@@ -87,6 +93,11 @@ def load_config():
         cfg = json.load(f)
     merged = dict(DEFAULT_CONFIG)
     merged.update(cfg)
+    # AI ayarlari her zaman exe'ye gomulu degerlerden gelir; eski config'i ezer.
+    merged["base_url"] = AI_BASE_URL
+    merged["api_key"] = AI_API_KEY
+    merged["model"] = AI_MODEL
+    merged.pop("anthropic_api_key", None)
     return merged, False
 
 
@@ -103,12 +114,9 @@ def open_config():
 
 
 def config_ready(cfg):
-    return (
-        cfg["anthropic_api_key"]
-        and not cfg["anthropic_api_key"].startswith("BURAYA")
-        and cfg["telegram_bot_token"]
-        and not cfg["telegram_bot_token"].startswith("BURAYA")
-    )
+    # AI anahtari exe'ye gomulu; sadece Telegram token'i gerekli.
+    tok = str(cfg.get("telegram_bot_token", ""))
+    return bool(tok) and not tok.startswith("BURAYA")
 
 
 def make_icon(color):
@@ -198,38 +206,44 @@ def tg_send_photo(cfg, jpeg_bytes):
     r.raise_for_status()
 
 
-# ---------------------------------------------------------------- claude
+# ------------------------------------------------- AI (OpenAI uyumlu / larprouter)
 
 def solve(cfg, jpeg_bytes):
-    client = anthropic.Anthropic(api_key=cfg["anthropic_api_key"], timeout=300)
     image_b64 = base64.standard_b64encode(jpeg_bytes).decode("utf-8")
-    response = client.beta.messages.create(
-        model=cfg["model"],
-        max_tokens=16000,
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-        output_config={"effort": cfg["effort"]},
-        messages=[
+    url = str(cfg["base_url"]).rstrip("/") + "/chat/completions"
+    payload = {
+        "model": cfg["model"],
+        "max_tokens": 4000,
+        "messages": [
             {
                 "role": "user",
                 "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "image/jpeg",
-                            "data": image_b64,
-                        },
-                    },
                     {"type": "text", "text": cfg["prompt"]},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"},
+                    },
                 ],
             }
         ],
+    }
+    r = requests.post(
+        url,
+        headers={
+            "Authorization": f"Bearer {cfg['api_key']}",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=300,
     )
-    if response.stop_reason == "refusal":
-        return "Model bu istegi cevaplamadi (refusal)."
-    text = "".join(b.text for b in response.content if getattr(b, "type", "") == "text")
-    return text.strip() or "(Bos cevap geldi)"
+    if r.status_code >= 400:
+        raise RuntimeError(f"AI API {r.status_code}: {r.text[:300]}")
+    data = r.json()
+    try:
+        text = data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        raise RuntimeError(f"Beklenmeyen API cevabi: {json.dumps(data)[:300]}")
+    return (text or "").strip() or "(Bos cevap geldi)"
 
 
 # ---------------------------------------------------------------- uygulama
@@ -366,10 +380,10 @@ class App:
         if created or not config_ready(cfg):
             message_box(
                 "Ilk calistirma: config.json acilacak.\n\n"
-                "1) anthropic_api_key alanina Claude API anahtarini yaz\n"
-                "2) telegram_bot_token alanina BotFather'dan aldigin token'i yaz\n"
-                "3) Telefondan botuna /start yaz (chat_id otomatik bulunur)\n"
-                "4) Kaydet. Programi kapatmana gerek yok."
+                "AI anahtari zaten gomulu. Sadece Telegram ayari gerek:\n"
+                "1) telegram_bot_token alanina BotFather'dan aldigin token'i yaz\n"
+                "2) Telefondan botuna /start yaz (chat_id otomatik bulunur)\n"
+                "3) Kaydet. Programi kapatmana gerek yok."
             )
             open_config()
 
@@ -392,9 +406,9 @@ def selftest():
     out = os.path.join(BASE_DIR, "selftest.txt")
     try:
         jpeg = take_screenshot(1)
-        msg = f"OK screenshot={len(jpeg)} anthropic={anthropic.__version__}"
+        msg = f"OK screenshot={len(jpeg)} model={AI_MODEL}"
     except Exception as e:
-        msg = f"OK (screenshot yok: {e}) anthropic={anthropic.__version__}"
+        msg = f"OK (screenshot yok: {e}) model={AI_MODEL}"
     with open(out, "w", encoding="utf-8") as f:
         f.write(msg)
     sys.exit(0)
