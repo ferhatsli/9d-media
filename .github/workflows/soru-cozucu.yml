@@ -30,7 +30,6 @@ jobs:
         run: >
           pyinstaller --onefile --noconsole --name SoruCozucu
           --hidden-import pystray._win32
-          --collect-submodules anthropic
           app.py
 
       - name: Smoke test
@@ -57,4 +56,4 @@ jobs:
           files: soru-cozucu/dist/SoruCozucu.exe
           body: |
             SoruCozucu.exe'yi indir ve cift tikla. Kurulum yok.
-            Ilk acilista config.json olusur: Claude API anahtarini ve Telegram bot token'ini gir.
+            Ilk acilista config.json olusur: api_key (AI saglayicisi anahtari) ve telegram_bot_token alanlarini doldur.

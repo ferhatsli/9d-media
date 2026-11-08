@@ -6,6 +6,7 @@ Claude API'ye gonderir, cevabi Telegram ile telefona yollar.
 
 import base64
 import ctypes
+import hashlib
 import io
 import json
 import logging
@@ -31,15 +32,26 @@ else:
 CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 LOG_PATH = os.path.join(BASE_DIR, "soru-cozucu.log")
 
-# --- AI saglayicisi (exe'ye gomulu; config.json'daki eski degerleri ezer) -----
+# --- AI saglayicisi ----------------------------------------------------------
 # OpenAI uyumlu uc nokta: POST {base_url}/chat/completions, Bearer + image_url.
+# API anahtari exe'ye gomulu DEGIL; config.json'daki "api_key" alanindan okunur.
+# Boylece anahtar degisince exe'yi yeniden derlemek gerekmez.
 AI_BASE_URL = "https://lutheos.com/v1"
-AI_API_KEY = "lrsk-f77fa864d7bfff210f8dc453e0ad5449bae5bd4eeb3cdf7e04ef7a10f7663ea7"
 AI_MODEL = "deepseek-v4.1-flash-1017-abliterated"
+API_KEY_PLACEHOLDER = "BURAYA_AI_API_KEY"
+
+# Eskiden exe'ye gomulu olan ve artik gecersiz (401) olan anahtarin SHA-256 ozeti.
+# Eski config.json'larda bu anahtar kayitli kaldiysa bos sayilir ve kullanicidan
+# yenisi istenir.
+LEGACY_API_KEY_SHA256 = {
+    "c5b1a7dde0fed5df3da3f37291a98360296190976ddf3f56ffe58b9661551174",
+}
+# Eski surumlerin config.json'a yazdigi, artik kullanilmayan adresler.
+LEGACY_BASE_URLS = ("larprouter.com",)
 
 DEFAULT_CONFIG = {
     "base_url": AI_BASE_URL,
-    "api_key": AI_API_KEY,
+    "api_key": API_KEY_PLACEHOLDER,
     "model": AI_MODEL,
     "telegram_bot_token": "BURAYA_TELEGRAM_BOT_TOKEN",
     "telegram_chat_id": "",
@@ -93,12 +105,40 @@ def load_config():
         cfg = json.load(f)
     merged = dict(DEFAULT_CONFIG)
     merged.update(cfg)
-    # AI ayarlari her zaman exe'ye gomulu degerlerden gelir; eski config'i ezer.
-    merged["base_url"] = AI_BASE_URL
-    merged["api_key"] = AI_API_KEY
-    merged["model"] = AI_MODEL
-    merged.pop("anthropic_api_key", None)
+    changed = False
+
+    # Eski surumlerden kalan alan
+    if "anthropic_api_key" in merged:
+        merged.pop("anthropic_api_key", None)
+        changed = True
+
+    # Eski, gecersiz gomulu anahtar -> kullanicidan yenisini iste
+    key = str(merged.get("api_key") or "").strip()
+    if not key or _sha256(key) in LEGACY_API_KEY_SHA256:
+        if key != API_KEY_PLACEHOLDER:
+            merged["api_key"] = API_KEY_PLACEHOLDER
+            changed = True
+
+    # Bos ya da eski adres -> guncel varsayilan
+    url = str(merged.get("base_url") or "").strip()
+    if not url or any(old in url for old in LEGACY_BASE_URLS):
+        merged["base_url"] = AI_BASE_URL
+        changed = url != AI_BASE_URL or changed
+    if not str(merged.get("model") or "").strip():
+        merged["model"] = AI_MODEL
+        changed = True
+
+    if changed:
+        try:
+            save_config(merged)
+            log.info("config.json guncellendi (eski ayarlar tasindi)")
+        except Exception:
+            log.exception("config.json guncellenemedi")
     return merged, False
+
+
+def _sha256(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def save_config(cfg):
@@ -113,10 +153,30 @@ def open_config():
         os.startfile(CONFIG_PATH)  # type: ignore[attr-defined]
 
 
+def _filled(value):
+    v = str(value or "").strip()
+    return bool(v) and not v.startswith("BURAYA")
+
+
+def ai_ready(cfg):
+    return _filled(cfg.get("api_key"))
+
+
+def telegram_ready(cfg):
+    return _filled(cfg.get("telegram_bot_token"))
+
+
 def config_ready(cfg):
-    # AI anahtari exe'ye gomulu; sadece Telegram token'i gerekli.
-    tok = str(cfg.get("telegram_bot_token", ""))
-    return bool(tok) and not tok.startswith("BURAYA")
+    return ai_ready(cfg) and telegram_ready(cfg)
+
+
+def missing_fields(cfg):
+    missing = []
+    if not ai_ready(cfg):
+        missing.append("api_key (AI saglayicisindan aldigin anahtar)")
+    if not telegram_ready(cfg):
+        missing.append("telegram_bot_token (BotFather'dan aldigin token)")
+    return missing
 
 
 def make_icon(color):
@@ -236,6 +296,11 @@ def solve(cfg, jpeg_bytes):
         json=payload,
         timeout=300,
     )
+    if r.status_code == 401:
+        raise RuntimeError(
+            "AI API anahtari gecersiz (401). config.json'daki \"api_key\" alanina "
+            "gecerli bir anahtar yaz ve kaydet; programi yeniden baslatmana gerek yok."
+        )
     if r.status_code >= 400:
         raise RuntimeError(f"AI API {r.status_code}: {r.text[:300]}")
     data = r.json()
@@ -284,7 +349,9 @@ class App:
         try:
             cfg, _ = load_config()
             if not config_ready(cfg):
-                message_box("Once config.json dosyasina API anahtari ve Telegram token gir.")
+                message_box(
+                    "config.json'da eksik alan var:\n- " + "\n- ".join(missing_fields(cfg))
+                )
                 open_config()
                 return
             jpeg = take_screenshot(int(cfg.get("monitor", 1)))
@@ -313,7 +380,7 @@ class App:
             self.set_icon(ICON_ERR, f"{APP_NAME} - hata (log'a bak)")
             sent = False
             try:
-                if cfg and config_ready(cfg):
+                if cfg and telegram_ready(cfg):
                     tg_send_text(cfg, f"❌ Hata: {e}")
                     sent = True
             except Exception as e2:
@@ -352,8 +419,8 @@ class App:
     def test_telegram(self, *_):
         def run():
             cfg, _ = load_config()
-            if not config_ready(cfg):
-                message_box("config.json eksik: API anahtari ve Telegram token gir.")
+            if not telegram_ready(cfg):
+                message_box("config.json eksik: telegram_bot_token alanini doldur.")
                 open_config()
                 return
             try:
@@ -379,11 +446,11 @@ class App:
         cfg, created = load_config()
         if created or not config_ready(cfg):
             message_box(
-                "Ilk calistirma: config.json acilacak.\n\n"
-                "AI anahtari zaten gomulu. Sadece Telegram ayari gerek:\n"
-                "1) telegram_bot_token alanina BotFather'dan aldigin token'i yaz\n"
-                "2) Telefondan botuna /start yaz (chat_id otomatik bulunur)\n"
-                "3) Kaydet. Programi kapatmana gerek yok."
+                "config.json acilacak. Su alanlari doldur:\n\n"
+                "1) api_key: AI saglayicisindan (lutheos.com) aldigin anahtar\n"
+                "2) telegram_bot_token: BotFather'dan aldigin token\n"
+                "3) Telefondan botuna /start yaz (chat_id otomatik bulunur)\n"
+                "4) Kaydet. Programi kapatmana gerek yok."
             )
             open_config()
 
