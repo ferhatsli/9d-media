@@ -37,7 +37,7 @@ LOG_PATH = os.path.join(BASE_DIR, "soru-cozucu.log")
 # API anahtari exe'ye gomulu DEGIL; config.json'daki "api_key" alanindan okunur.
 # Boylece anahtar degisince exe'yi yeniden derlemek gerekmez.
 AI_BASE_URL = "https://lutheos.com/v1"
-AI_MODEL = "deepseek-v4.1-flash-1017-abliterated"
+AI_MODEL = "deepseek-v4.1-flash-abliterated"  # gorsel destekleyen tek model
 API_KEY_PLACEHOLDER = "BURAYA_AI_API_KEY"
 
 # Eskiden exe'ye gomulu olan ve artik gecersiz (401) olan anahtarin SHA-256 ozeti.
@@ -48,6 +48,8 @@ LEGACY_API_KEY_SHA256 = {
 }
 # Eski surumlerin config.json'a yazdigi, artik kullanilmayan adresler.
 LEGACY_BASE_URLS = ("larprouter.com",)
+# Eski surumlerin config.json'a yazdigi, saglayicida olmayan model adlari.
+LEGACY_MODELS = ("deepseek-v4.1-flash-1017-abliterated",)
 
 DEFAULT_CONFIG = {
     "base_url": AI_BASE_URL,
@@ -124,7 +126,8 @@ def load_config():
     if not url or any(old in url for old in LEGACY_BASE_URLS):
         merged["base_url"] = AI_BASE_URL
         changed = url != AI_BASE_URL or changed
-    if not str(merged.get("model") or "").strip():
+    model = str(merged.get("model") or "").strip()
+    if not model or model in LEGACY_MODELS:
         merged["model"] = AI_MODEL
         changed = True
 
@@ -300,6 +303,11 @@ def solve(cfg, jpeg_bytes):
         raise RuntimeError(
             "AI API anahtari gecersiz (401). config.json'daki \"api_key\" alanina "
             "gecerli bir anahtar yaz ve kaydet; programi yeniden baslatmana gerek yok."
+        )
+    if r.status_code == 400 and "model_unpriced_or_unavailable" in r.text:
+        raise RuntimeError(
+            f"Model saglayicida yok: \"{cfg['model']}\". config.json'daki \"model\" "
+            f"alanina saglayici panelindeki model ID'sini yaz (varsayilan: {AI_MODEL})."
         )
     if r.status_code >= 400:
         raise RuntimeError(f"AI API {r.status_code}: {r.text[:300]}")
