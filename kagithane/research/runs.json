@@ -1,0 +1,5 @@
+{
+ "ig": ["apify~instagram-hashtag-scraper", {"hashtags":["satılıkişyeri","satılıkimalathane","satılıkofis","ticarigayrimenkul","satılıkdepo","commercialrealestate","warehouseforsale","industrialrealestate"],"resultsType":"reels","resultsLimit":25}],
+ "tt": ["clockworks~tiktok-scraper", {"searchQueries":["satılık işyeri","satılık imalathane","satılık depo","commercial real estate tour","warehouse for sale tour","office building for sale"],"searchSection":"/video","resultsPerPage":20,"videoSearchSorting":"MOST_RELEVANT","shouldDownloadVideos":false,"shouldDownloadCovers":false}],
+ "yt": ["streamers~youtube-scraper", {"searchQueries":["satılık işyeri tanıtım","satılık imalathane","commercial property tour","warehouse for sale video tour"],"maxResults":5,"maxResultsShorts":15,"maxResultStreams":0}]
+}

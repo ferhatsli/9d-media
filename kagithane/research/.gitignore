@@ -1,0 +1,5 @@
+# Üçüncü taraf ham veri, indirilen videolar ve kareler repo'ya girmez (telif + boyut)
+raw/
+deep/vid/
+deep/frames/
+deep/montage/
