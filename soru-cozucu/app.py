@@ -33,7 +33,7 @@ LOG_PATH = os.path.join(BASE_DIR, "soru-cozucu.log")
 
 # --- AI saglayicisi (exe'ye gomulu; config.json'daki eski degerleri ezer) -----
 # OpenAI uyumlu uc nokta: POST {base_url}/chat/completions, Bearer + image_url.
-AI_BASE_URL = "https://larprouter.com/v1"
+AI_BASE_URL = "https://lutheos.com/v1"
 AI_API_KEY = "lrsk-f77fa864d7bfff210f8dc453e0ad5449bae5bd4eeb3cdf7e04ef7a10f7663ea7"
 AI_MODEL = "deepseek-v4.1-flash-1017-abliterated"
 
